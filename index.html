@@ -40,7 +40,7 @@
     .kpi small{display:block;color:#8fa8c8;font-size:12px;margin-bottom:4px}
     .kpi strong{font-size:16px;color:#ffffff}
     .charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:16px}
-    .chart{height:340px;background:#fff;border-radius:10px;padding:4px}
+    .chart{height:340px;background:#fff;border-radius:10px;padding:6px;overflow:hidden}
     .tablewrap{overflow:auto;max-height:420px}
     table{width:100%;border-collapse:collapse;font-size:13px}
     td,th{padding:8px 9px;border-bottom:1px solid #334661;text-align:left}
@@ -187,7 +187,30 @@
       el('dbBadge').textContent = 'Modo estático: localStorage';
     }
 
-    function selectCase(key) {
+    function clearResults() {
+      latest = null;
+      el('scenarioBadge').textContent = el('scenario').value.replace('_', ' ');
+      el('scenarioBadge').className = scenarioBadgeClass(el('scenario').value);
+      el('kpis').innerHTML = `
+        <div class="kpi"><small>Estado</small><strong>Listo para simular</strong></div>
+        <div class="kpi"><small>Mejor método</small><strong>—</strong></div>
+        <div class="kpi"><small>Menor error abs.</small><strong>—</strong></div>`;
+      el('summary').innerHTML = 'Selecciona un escenario y pulsa <strong>Ejecutar y guardar</strong> para ver resultados, gráficos e iteraciones.';
+      el('methods').innerHTML = '';
+      el('methodChoice').innerHTML = '';
+      el('methodMeta').style.display = 'none';
+      el('iterations').innerHTML = '';
+      el('numConclusion').textContent = '—';
+      el('caseConclusion').textContent = '—';
+      el('notes').innerHTML = '';
+      ['chart1', 'chart2'].forEach(cid => {
+        if (window.Plotly) Plotly.purge(cid);
+        el(cid).innerHTML = '';
+      });
+    }
+
+    function selectCase(key, keepResults = false) {
+      const changed = key !== current;
       current = key;
       el('cards').innerHTML = Object.entries(cases).map(([k, v]) =>
         `<div class="card ${k === current ? 'active' : ''}" data-key="${k}"><span>${v.icon}</span><strong>${v.name}</strong></div>`
@@ -196,6 +219,7 @@
       el('title').textContent = cases[key].name;
       el('comparePanel').classList.add('hidden');
       fields();
+      if (changed && !keepResults) clearResults();
     }
 
     function fields() {
@@ -280,8 +304,11 @@
         }
       });
 
-      el('methods').innerHTML = '<table><thead><tr><th>Método</th><th>Valor aprox.</th><th>Referencia</th><th>Error abs.</th><th>Error %</th><th>Residual</th><th>Iter.</th></tr></thead><tbody>' +
-        d.metodos.map(m => `<tr><td><strong>${esc(m.metodo)}</strong></td><td>${esc(fmt(m.valor))}</td><td>${esc(fmt(m.referencia))}</td><td>${fmt(m.error_abs)}</td><td>${m.error_porcentual != null ? fmt(m.error_porcentual) + '%' : '—'}</td><td>${m.residual != null ? fmt(m.residual) : '—'}</td><td>${m.iteraciones.length}</td></tr>`).join('') +
+      el('methods').innerHTML = '<table><thead><tr><th>Método</th><th>Valor aprox.</th><th>Referencia</th><th>Error abs.</th><th>Error %</th><th>Residual</th><th>Iter.</th><th>Estado</th></tr></thead><tbody>' +
+        d.metodos.map(m => {
+          const conv = m.detalles && 'convergio' in m.detalles ? (m.detalles.convergio ? 'Convergió' : 'No convergió') : 'Completado';
+          return `<tr><td><strong>${esc(m.metodo)}</strong></td><td>${esc(fmt(m.valor))}</td><td>${esc(fmt(m.referencia))}</td><td>${fmt(m.error_abs)}</td><td>${m.error_porcentual != null ? fmt(m.error_porcentual) + '%' : '—'}</td><td>${m.residual != null ? fmt(m.residual) : '—'}</td><td>${m.iteraciones.length}</td><td>${conv}</td></tr>`;
+        }).join('') +
         '</tbody></table>';
 
       el('methodChoice').innerHTML = d.metodos.map((m, i) => {
@@ -311,7 +338,7 @@
       if (m.iteraciones.length) {
         el('iterations').innerHTML = '<table><thead><tr><th>N° / Nivel</th><th>Aproximación</th><th>Residual</th></tr></thead><tbody>' +
           m.iteraciones.slice(0, 250).map((r, i) =>
-            `<tr><td>${r.numero || r.nivel || i + 1}</td><td>${esc(fmt(r.aproximacion))}</td><td>${r.residual != null ? fmt(r.residual) : '—'}</td></tr>`
+            `<tr><td>${r.numero ?? r.nivel ?? (i + 1)}</td><td>${esc(fmt(r.aproximacion))}</td><td>${r.residual != null ? fmt(r.residual) : '—'}</td></tr>`
           ).join('') + '</tbody></table>';
       } else {
         el('iterations').innerHTML = '<table><thead><tr><th>Campo</th><th>Valor registrado</th></tr></thead><tbody>' +
@@ -336,7 +363,9 @@
         });
         el('compareTable').innerHTML = '<table><thead><tr><th>Escenario</th><th>Resultado principal</th><th>Mejor método</th><th>Error abs.</th><th>Iter.</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
         el('comparePanel').classList.remove('hidden');
-        el('status').textContent = 'Comparación de los 3 escenarios generada.';
+        const activeSc = el('scenario').value;
+        render(N.run(current, activeSc, { ...base, ...(presets[current][activeSc] || {}) }));
+        el('status').textContent = 'Comparación de los 3 escenarios y gráficas actualizadas.';
       } catch (e) {
         el('status').textContent = 'Error al comparar: ' + e.message;
       }
@@ -377,7 +406,7 @@
             d = getSavedLocal().find(r => r.id === id);
             if (!d) throw Error('Experimento no encontrado');
           }
-          selectCase(d.caso);
+          selectCase(d.caso, true);
           el('scenario').value = d.escenario;
           Object.entries(d.parametros).forEach(([k, v]) => {
             const inp = document.querySelector(`[data-param="${k}"]`);
