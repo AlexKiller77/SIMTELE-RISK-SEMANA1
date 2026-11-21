@@ -28,3 +28,34 @@ Plotly se carga desde CDN; se requiere conexión a Internet para mostrar los gr�
 ## Pruebas
 
 Ejecutar `node tests.js` si Node.js está instalado. También puede abrirse `index.html` directamente en el navegador.
+
+# SIMTELE-RISK — Semana 2 (Integración matemática y persistencia SQL)
+
+Aplicación educativa de Métodos Numéricos con cuatro módulos, tres escenarios por módulo (`NORMAL`, `ESTRÉS`, `MAL CONDICIONADO`) y persistencia en base de datos SQLite (con respaldo automático en `localStorage` si se abre de forma estática en GitHub Pages).
+
+## Ejecución con Base de Datos SQL (Recomendado para Semana 2)
+
+1. Abrir una terminal en la carpeta del proyecto.
+2. Iniciar el servidor Python (no requiere instalar paquetes externos):
+   ```bash
+   python server.py
+   ```
+3. Abrir en el navegador: `http://localhost:8000`
+4. Verificar que el indicador superior muestre **BD SQL: SQLite conectada**.
+
+La base de datos `simtele_risk.db` se crea automáticamente a partir de `schema.sql` con las 6 entidades obligatorias (`caso_estudio`, `escenario`, `simulacion`, `ejecucion_metodo`, `iteracion_resultado`, `resultado_resumen`).
+
+## Pruebas automatizadas
+
+- **Algoritmos numéricos (12 combinaciones módulo × escenario):**
+  ```bash
+  node tests.js
+  ```
+- **Persistencia SQL (guardar, cerrar, recuperar y verificar):**
+  ```bash
+  python test_db.py
+  ```
+
+## Publicación estática (GitHub Pages)
+
+Si se publica `index.html` y `numerics.js` en GitHub Pages, la aplicación detecta la ausencia de backend y opera automáticamente en modo estático con `localStorage`.

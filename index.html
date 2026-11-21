@@ -1,16 +1,128 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SIMTELE-RISK | Laboratorio numérico</title><script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script><style>
-:root{font-family:Inter,system-ui,Arial,sans-serif;color:#e5ecfa;background:#0b1220}*{box-sizing:border-box}body{margin:0}header{padding:23px 5%;background:#111d32;border-bottom:1px solid #26364f}h1{margin:0;font-size:27px}h2{margin:0 0 12px}h3{margin:12px 0}p{color:#aebed5;line-height:1.5}.shell{max-width:1450px;margin:auto;padding:24px 4%}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card,.panel{border:1px solid #293b57;background:#15223a;border-radius:15px;padding:18px}.card{cursor:pointer;min-height:120px}.card.active{border:2px solid #4aa8ff;background:#1c3151}.card span{font-size:27px}.card strong{display:block;margin-top:8px}.cols{display:grid;grid-template-columns:310px 1fr;gap:18px;margin-top:20px}.panel{margin-bottom:16px}label{display:block;color:#b4c8e0;margin:10px 0 4px;font-size:13px}input,select,button{width:100%;border-radius:8px;padding:10px;background:#0c172a;color:white;border:1px solid #405371}button{background:#2386e5;border:0;cursor:pointer;font-weight:700;margin-top:13px}button.secondary{background:#2b405f}.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.chart{height:340px;background:#fff;border-radius:10px}.tablewrap{overflow:auto;max-height:430px}table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:9px;border-bottom:1px solid #334661;text-align:left}th{color:#79c1ff}small{color:#9db2cc}.notice{background:#233751;padding:12px;border-radius:9px;color:#d7e6fa}.hidden{display:none}#status{color:#75c6ff;min-height:24px}pre{white-space:pre-wrap;word-break:break-word;color:#c8ddf7;font-size:12px}@media(max-width:850px){.cards{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}.charts{grid-template-columns:1fr}}@media(max-width:450px){.cards{grid-template-columns:1fr}}
-</style></head><body><header><h1>🚡 SIMTELE-RISK</h1><p>Laboratorio de métodos numéricos · Modelos educativos hipotéticos · La Paz, Bolivia</p></header><main class="shell"><div class="cards" id="cards"></div><div class="cols"><aside><div class="panel"><h2>Configuración</h2><label>Escenario</label><select id="scenario"><option value="NORMAL">NORMAL</option><option value="ESTRES">ESTRÉS</option><option value="MAL_CONDICIONADO">MAL CONDICIONADO</option></select><div id="fields"></div><button id="run">▶ Ejecutar y guardar</button><div id="status"></div></div><div class="panel"><h2>Historial local (este navegador)</h2><button class="secondary" id="refresh">Actualizar historial</button><div id="history"></div></div></aside><section><div class="panel"><h2 id="title">Resultados de simulación</h2><div id="summary" class="notice">Selecciona un caso y ejecuta una simulación. Los resultados se guardan en este navegador.</div></div><div class="charts"><div id="chart1" class="chart"></div><div id="chart2" class="chart"></div></div><div class="panel"><h2>Comparación de métodos y errores</h2><div class="tablewrap" id="methods"></div><h3>Iteraciones / refinamiento</h3><select id="methodChoice"></select><div class="tablewrap" id="iterations"></div></div><div class="panel"><h2>Interpretación técnica</h2><h3>Conclusión numérica</h3><p id="numConclusion">—</p><h3>Conclusión del problema</h3><p id="caseConclusion">—</p><h3>Supuestos y limitaciones</h3><div id="notes"></div></div></section></div></main><script src="numerics.js"></script><script>
-const cases={detencion:{icon:'🛑',name:'Detención de emergencia',fields:{v0:['Velocidad inicial (m/s)',5],a:['Desaceleración (m/s²)',1],reaccion:['Reacción (s)',.7],pasos:['Subintervalos (par)',40]}},deterioro:{icon:'⚙️',name:'Deterioro y mantenimiento',fields:{D0:['Deterioro inicial',.1],alpha:['Coeficiente lineal',.06],beta:['Coeficiente cuadrático',.005],umbral:['Umbral',.8]}},oscilaciones:{icon:'🌬️',name:'Oscilaciones por viento',fields:{m:['Masa (unidades)',2],c:['Amortiguamiento',.7],k:['Rigidez',8],x0:['Desplazamiento inicial (m)',.15],v0:['Velocidad inicial',0],fuerza:['Amplitud de fuerza',0],duracion:['Duración (s)',12],pasos:['Subintervalos (par)',120]}},sensores:{icon:'📡',name:'Reconstrucción de sensores',fields:{nodos:['Número de nodos',9],ruido:['Desviación ruido',0]}}};let current='detencion',latest=null;
-const el=id=>document.getElementById(id);const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;');const fmt=v=>typeof v==='number'?(Math.abs(v)>1e6||Math.abs(v)<.0001&&v!==0?v.toExponential(3):v.toFixed(6)):JSON.stringify(v).slice(0,100);
-function selectCase(key){current=key;el('cards').innerHTML=Object.entries(cases).map(([k,v])=>`<div class="card ${k===current?'active':''}" data-key="${k}"><span>${v.icon}</span><strong>${v.name}</strong></div>`).join('');document.querySelectorAll('[data-key]').forEach(c=>c.onclick=()=>selectCase(c.dataset.key));el('title').textContent=cases[key].name;fields();}
-function fields(){el('fields').innerHTML=Object.entries(cases[current].fields).map(([k,[label,value]])=>`<label>${label}</label><input type="number" step="any" data-param="${k}" value="${value}">`).join('')}
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SIMTELE-RISK | Laboratorio numérico (Semana 2)</title><script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script><style>
+:root{font-family:Inter,system-ui,Arial,sans-serif;color:#e5ecfa;background:#0b1220}*{box-sizing:border-box}body{margin:0}header{padding:20px 5%;background:#111d32;border-bottom:1px solid #26364f;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}h1{margin:0;font-size:26px}h2{margin:0 0 12px}h3{margin:12px 0}p{color:#aebed5;line-height:1.5;margin:4px 0 0}.badge{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:700;background:#1e3a5f;color:#79c1ff;border:1px solid #3b5b84}.badge.ok{background:#123828;color:#6ee7b7;border-color:#10b981}.shell{max-width:1450px;margin:auto;padding:24px 4%}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card,.panel{border:1px solid #293b57;background:#15223a;border-radius:15px;padding:18px}.card{cursor:pointer;min-height:110px}.card.active{border:2px solid #4aa8ff;background:#1c3151}.card span{font-size:26px}.card strong{display:block;margin-top:8px}.cols{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-top:20px}.panel{margin-bottom:16px}label{display:block;color:#b4c8e0;margin:10px 0 4px;font-size:13px}input,select,button{width:100%;border-radius:8px;padding:10px;background:#0c172a;color:white;border:1px solid #405371}button{background:#2386e5;border:0;cursor:pointer;font-weight:700;margin-top:12px}button.secondary{background:#2b405f;text-align:left;font-size:13px}.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:16px}.chart{height:340px;background:#fff;border-radius:10px}.tablewrap{overflow:auto;max-height:430px}table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:8px 9px;border-bottom:1px solid #334661;text-align:left}th{color:#79c1ff}small{color:#9db2cc}.notice{background:#233751;padding:12px;border-radius:9px;color:#d7e6fa}#status{color:#75c6ff;min-height:24px;margin-top:8px;font-size:13px}pre{white-space:pre-wrap;word-break:break-word;color:#c8ddf7;font-size:12px}@media(max-width:850px){.cards{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}.charts{grid-template-columns:1fr}}@media(max-width:450px){.cards{grid-template-columns:1fr}}
+</style></head><body><header><div><h1>🚡 SIMTELE-RISK</h1><p>Laboratorio de métodos numéricos · Modelos educativos hipotéticos · La Paz, Bolivia</p></div><span id="dbBadge" class="badge">Verificando persistencia…</span></header><main class="shell"><div class="cards" id="cards"></div><div class="cols"><aside><div class="panel"><h2>Configuración</h2><label>Escenario</label><select id="scenario"><option value="NORMAL">NORMAL</option><option value="ESTRES">ESTRÉS</option><option value="MAL_CONDICIONADO">MAL CONDICIONADO</option></select><div id="fields"></div><button id="run">▶ Ejecutar y guardar</button><div id="status"></div></div><div class="panel"><h2>Historial de simulaciones</h2><input type="text" id="searchHistory" placeholder="Buscar por caso, escenario o #ID…"><button class="secondary" id="refresh" style="text-align:center">Actualizar historial</button><div id="history"></div></div></aside><section><div class="panel"><h2 id="title">Resultados de simulación</h2><div id="summary" class="notice">Selecciona un caso y ejecuta una simulación.</div></div><div class="charts"><div id="chart1" class="chart"></div><div id="chart2" class="chart"></div></div><div class="panel"><h2>Comparación de métodos y errores</h2><div class="tablewrap" id="methods"></div><h3>Iteraciones / refinamiento</h3><select id="methodChoice"></select><div class="tablewrap" id="iterations"></div></div><div class="panel"><h2>Interpretación técnica</h2><h3>Conclusión numérica</h3><p id="numConclusion">—</p><h3>Conclusión del problema</h3><p id="caseConclusion">—</p><h3>Supuestos y limitaciones</h3><div id="notes"></div></div></section></div></main><script src="numerics.js"></script><script>
+const cases={detencion:{icon:'🛑',name:'Detención de emergencia',fields:{v0:['Velocidad inicial (m/s)',5],a:['Desaceleración (m/s²)',1],reaccion:['Reacción (s)',.7],pasos:['Subintervalos (par)',40]}},deterioro:{icon:'⚙️',name:'Deterioro y mantenimiento',fields:{D0:['Deterioro inicial',.1],alpha:['Coeficiente lineal',.06],beta:['Coeficiente cuadrático',.005],umbral:['Umbral',.8]}},oscilaciones:{icon:'🌬️',name:'Oscilaciones por viento',fields:{m:['Masa (unidades)',2],c:['Amortiguamiento',.7],k:['Rigidez',8],x0:['Desplazamiento inicial (m)',.15],v0:['Velocidad inicial',0],fuerza:['Amplitud de fuerza',0],duracion:['Duración (s)',12],pasos:['Subintervalos (par)',120]}},sensores:{icon:'📡',name:'Reconstrucción de sensores',fields:{nodos:['Número de nodos',9],ruido:['Desviación ruido',0]}}};
+let current='detencion',latest=null,useSQL=false;
+const el=id=>document.getElementById(id);
+const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;');
+const fmt=v=>typeof v==='number'?(Math.abs(v)>1e6||Math.abs(v)<.0001&&v!==0?v.toExponential(3):v.toFixed(6)):Array.isArray(v)?`[${v.slice(0,4).map(x=>typeof x==='number'?x.toFixed(4):x).join(', ')}${v.length>4?', …':''}]`:JSON.stringify(v).slice(0,80);
+
+async function checkDB(){
+  try{
+    const r=await fetch('/api/health');
+    if(r.ok){useSQL=true;el('dbBadge').textContent='BD SQL: SQLite conectada';el('dbBadge').classList.add('ok');return;}
+  }catch{}
+  useSQL=false;
+  el('dbBadge').textContent='Modo estático: localStorage';
+}
+
+function selectCase(key){
+  current=key;
+  el('cards').innerHTML=Object.entries(cases).map(([k,v])=>`<div class="card ${k===current?'active':''}" data-key="${k}"><span>${v.icon}</span><strong>${v.name}</strong></div>`).join('');
+  document.querySelectorAll('[data-key]').forEach(c=>c.onclick=()=>selectCase(c.dataset.key));
+  el('title').textContent=cases[key].name;
+  fields();
+}
+function fields(){
+  el('fields').innerHTML=Object.entries(cases[current].fields).map(([k,[label,value]])=>`<label>${label}</label><input type="number" step="any" data-param="${k}" value="${value}">`).join('');
+}
+
 const STORAGE='simtele-risk-experimentos-v1';
-function getSaved(){try{return JSON.parse(localStorage.getItem(STORAGE)||'[]')}catch{return []}}
-function saveSaved(rows){try{localStorage.setItem(STORAGE,JSON.stringify(rows))}catch(e){throw Error('No se pudo guardar en este navegador: '+e.message)}}
-function simulate(){el('status').textContent='Calculando…';const params={};document.querySelectorAll('[data-param]').forEach(i=>params[i.dataset.param]=Number(i.value));try{const data=N.run(current,el('scenario').value,params);const rows=getSaved();data.id=rows.length?Math.max(...rows.map(r=>r.id))+1:1;data.fecha=new Date().toISOString();rows.unshift(data);saveSaved(rows);render(data);el('status').textContent='Simulación guardada localmente #'+data.id;history()}catch(e){el('status').textContent='Error: '+e.message}}
-function render(d){latest=d;el('title').textContent=cases[d.caso].name+' · '+d.escenario;el('summary').innerHTML='<strong>Resultados:</strong><pre>'+esc(JSON.stringify(d.resumen,null,2))+'</pre><small>'+esc(d.fuente_parametros)+'</small>';d.graficos.forEach((g,i)=>{const traces=g.series.map(s=>({x:g.x,y:s.y,name:s.nombre,mode:'lines',type:'scatter'}));if(window.Plotly)Plotly.newPlot('chart'+(i+1),traces,{title:g.titulo,margin:{l:60,r:20,t:50,b:50},paper_bgcolor:'#fff',plot_bgcolor:'#fff',font:{size:11},legend:{orientation:'h',y:-.25}},{responsive:true});else el('chart'+(i+1)).textContent='Se requiere internet para Plotly.'});el('methods').innerHTML='<table><thead><tr><th>Método</th><th>Error abs.</th><th>Error rel.</th><th>Error %</th><th>Residual</th><th>Iter.</th></tr></thead><tbody>'+d.metodos.map(m=>`<tr><td>${esc(m.metodo)}</td><td>${fmt(m.error_abs)}</td><td>${fmt(m.error_rel)}</td><td>${fmt(m.error_porcentual)}</td><td>${fmt(m.residual)}</td><td>${m.iteraciones.length}</td></tr>`).join('')+'</tbody></table>';el('methodChoice').innerHTML=d.metodos.map((m,i)=>`<option value="${i}">${esc(m.metodo)}</option>`).join('');el('methodChoice').onchange=iterations;iterations();el('numConclusion').textContent=d.conclusion_numerica;el('caseConclusion').textContent=d.conclusion_problema;el('notes').innerHTML=d.notas.map(n=>'<p>• '+esc(n)+'</p>').join('')}
-function iterations(){if(!latest)return;let m=latest.metodos[Number(el('methodChoice').value)||0];el('iterations').innerHTML=m.iteraciones.length?'<table><tr><th>N°</th><th>Aproximación</th><th>Residual</th></tr>'+m.iteraciones.slice(0,250).map((r,i)=>`<tr><td>${r.numero||r.nivel||i+1}</td><td>${esc(fmt(r.aproximacion))}</td><td>${fmt(r.residual)}</td></tr>`).join('')+'</table>':'Este método devuelve un resultado directo o una serie sin iteraciones registradas.'}
-function history(){const rows=getSaved();el('history').innerHTML=rows.slice(0,50).map(r=>`<button class="secondary" data-history="${r.id}">#${r.id} · ${esc(r.caso)} · ${esc(r.escenario)}</button>`).join('')||'<p>Sin simulaciones guardadas en este navegador.</p>';document.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>{try{const d=getSaved().find(r=>r.id===Number(b.dataset.history));if(!d)throw Error('Experimento no encontrado');selectCase(d.caso);el('scenario').value=d.escenario;Object.entries(d.parametros).forEach(([k,v])=>{const inp=document.querySelector(`[data-param="${k}"]`);if(inp)inp.value=v});render(d);const again=N.run(d.caso,d.escenario,d.parametros);const matches=JSON.stringify(again.resumen)===JSON.stringify(d.resumen);el('status').textContent=matches?'Recuperación y repetición verificadas':'Repetición: revise diferencias de precisión';}catch(e){el('status').textContent=e.message}})}
-el('run').onclick=simulate;el('refresh').onclick=history;el('scenario').onchange=()=>{fields();const scenario=el('scenario').value;const preset={detencion:{ESTRES:{v0:8,a:.7,reaccion:1.2,pasos:20},MAL_CONDICIONADO:{a:.015}},deterioro:{ESTRES:{alpha:.11,beta:.012},MAL_CONDICIONADO:{alpha:.00001,beta:.000001,umbral:.1001}},oscilaciones:{ESTRES:{fuerza:2,c:.25,x0:.3,pasos:60},MAL_CONDICIONADO:{c:.001,k:.00001,duracion:50,pasos:80}},sensores:{ESTRES:{nodos:13,ruido:.12},MAL_CONDICIONADO:{nodos:17,ruido:.0001}}};Object.entries(preset[current][scenario]||{}).forEach(([k,v])=>{const input=document.querySelector(`[data-param="${k}"]`);if(input)input.value=v});el('status').textContent='Parámetros sugeridos cargados para '+scenario};selectCase(current);history();
+function getSavedLocal(){try{return JSON.parse(localStorage.getItem(STORAGE)||'[]')}catch{return []}}
+function saveSavedLocal(rows){localStorage.setItem(STORAGE,JSON.stringify(rows))}
+
+async function simulate(){
+  el('status').textContent='Calculando…';
+  const params={};
+  document.querySelectorAll('[data-param]').forEach(i=>params[i.dataset.param]=Number(i.value));
+  try{
+    const data=N.run(current,el('scenario').value,params);
+    if(useSQL){
+      const resp=await fetch('/api/simulaciones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      if(!resp.ok)throw Error('No se pudo guardar en SQLite');
+      const saved=await resp.json();
+      data.id=saved.id;data.fecha=saved.fecha;
+      el('status').textContent='Guardado en BD SQLite #'+data.id;
+    }else{
+      const rows=getSavedLocal();
+      data.id=rows.length?Math.max(...rows.map(r=>r.id))+1:1;
+      data.fecha=new Date().toISOString();
+      rows.unshift(data);
+      saveSavedLocal(rows);
+      el('status').textContent='Guardado localmente #'+data.id;
+    }
+    render(data);
+    await history();
+  }catch(e){el('status').textContent='Error: '+e.message}
+}
+
+function render(d){
+  latest=d;
+  el('title').textContent=cases[d.caso].name+' · '+d.escenario;
+  el('summary').innerHTML='<strong>Resultados:</strong><pre>'+esc(JSON.stringify(d.resumen,null,2))+'</pre><small>'+esc(d.fuente_parametros)+'</small>';
+  d.graficos.forEach((g,i)=>{
+    const traces=g.series.map(s=>({x:g.x,y:s.y,name:s.nombre,mode:'lines',type:'scatter'}));
+    if(window.Plotly)Plotly.newPlot('chart'+(i+1),traces,{title:g.titulo,margin:{l:60,r:20,t:50,b:50},paper_bgcolor:'#fff',plot_bgcolor:'#fff',font:{size:11},legend:{orientation:'h',y:-.25}},{responsive:true});
+    else el('chart'+(i+1)).textContent='Se requiere internet para Plotly.';
+  });
+  el('methods').innerHTML='<table><thead><tr><th>Método</th><th>Valor aprox.</th><th>Referencia</th><th>Error abs.</th><th>Error %</th><th>Residual</th><th>Iter.</th></tr></thead><tbody>'+d.metodos.map(m=>`<tr><td><strong>${esc(m.metodo)}</strong></td><td>${esc(fmt(m.valor))}</td><td>${esc(fmt(m.referencia))}</td><td>${fmt(m.error_abs)}</td><td>${m.error_porcentual!=null?fmt(m.error_porcentual)+'%':'—'}</td><td>${m.residual!=null?fmt(m.residual):'—'}</td><td>${m.iteraciones.length}</td></tr>`).join('')+'</tbody></table>';
+  el('methodChoice').innerHTML=d.metodos.map((m,i)=>`<option value="${i}">${esc(m.metodo)}</option>`).join('');
+  el('methodChoice').onchange=iterations;
+  iterations();
+  el('numConclusion').textContent=d.conclusion_numerica;
+  el('caseConclusion').textContent=d.conclusion_problema;
+  el('notes').innerHTML=d.notas.map(n=>'<p>• '+esc(n)+'</p>').join('');
+}
+
+function iterations(){
+  if(!latest)return;
+  const m=latest.metodos[Number(el('methodChoice').value)||0];
+  el('iterations').innerHTML=m.iteraciones.length?'<table><tr><th>N°</th><th>Aproximación</th><th>Residual</th></tr>'+m.iteraciones.slice(0,250).map((r,i)=>`<tr><td>${r.numero||r.nivel||i+1}</td><td>${esc(fmt(r.aproximacion))}</td><td>${r.residual!=null?fmt(r.residual):'—'}</td></tr>`).join('')+'</table>':'Este método devuelve un resultado directo o una serie sin iteraciones registradas.';
+}
+
+async function history(){
+  const q=el('searchHistory').value.trim();
+  let rows=[];
+  if(useSQL){
+    const r=await fetch('/api/simulaciones'+(q?'?q='+encodeURIComponent(q):''));
+    if(r.ok)rows=await r.json();
+  }else{
+    rows=getSavedLocal().filter(r=>!q||String(r.id).includes(q)||r.caso.includes(q.toLowerCase())||r.escenario.includes(q.toUpperCase()));
+  }
+  el('history').innerHTML=rows.slice(0,50).map(r=>`<button class="secondary" data-history="${r.id}">#${r.id} · ${esc(r.caso)} · ${esc(r.escenario)}<br><small>${esc((r.fecha||'').slice(0,19).replace('T',' '))}</small></button>`).join('')||'<p>Sin simulaciones guardadas.</p>';
+  document.querySelectorAll('[data-history]').forEach(b=>b.onclick=async()=>{
+    try{
+      const id=Number(b.dataset.history);
+      let d;
+      if(useSQL){
+        const r=await fetch('/api/simulaciones/'+id);
+        if(!r.ok)throw Error('No encontrado en BD');
+        d=await r.json();
+      }else{
+        d=getSavedLocal().find(r=>r.id===id);
+        if(!d)throw Error('Experimento no encontrado');
+      }
+      selectCase(d.caso);
+      el('scenario').value=d.escenario;
+      Object.entries(d.parametros).forEach(([k,v])=>{const inp=document.querySelector(`[data-param="${k}"]`);if(inp)inp.value=v});
+      const again=N.run(d.caso,d.escenario,d.parametros);
+      d.graficos=again.graficos;
+      render(d);
+      const matches=JSON.stringify(again.resumen)===JSON.stringify(d.resumen);
+      el('status').textContent=matches?`#${id} recuperado y verificado dentro de tolerancia`:'Recuperado: revise diferencias de precisión';
+    }catch(e){el('status').textContent=e.message}
+  });
+}
+
+el('run').onclick=simulate;
+el('refresh').onclick=history;
+el('searchHistory').oninput=history;
+el('scenario').onchange=()=>{
+  fields();
+  const scenario=el('scenario').value;
+  const preset={detencion:{ESTRES:{v0:8,a:.7,reaccion:1.2,pasos:20},MAL_CONDICIONADO:{a:.015}},deterioro:{ESTRES:{alpha:.11,beta:.012},MAL_CONDICIONADO:{alpha:.00001,beta:.000001,umbral:.1001}},oscilaciones:{ESTRES:{fuerza:2,c:.25,x0:.3,pasos:60},MAL_CONDICIONADO:{c:.001,k:.00001,duracion:50,pasos:80}},sensores:{ESTRES:{nodos:13,ruido:.12},MAL_CONDICIONADO:{nodos:17,ruido:.0001}}};
+  Object.entries(preset[current][scenario]||{}).forEach(([k,v])=>{const input=document.querySelector(`[data-param="${k}"]`);if(input)input.value=v});
+  el('status').textContent='Parámetros sugeridos cargados para '+scenario;
+};
+(async()=>{await checkDB();selectCase(current);await history();})();
 </script></body></html>
